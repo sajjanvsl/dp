@@ -327,7 +327,71 @@ if st.session_state.role == "Admin":
     st.subheader("🗄 Prediction Logs")
     logs = pd.read_sql("SELECT * FROM predictions", conn)
     st.dataframe(logs)
-    
+
+# ================== MODEL VALIDATION (STANDARD DATASET) ==================
+if st.session_state.role == "Admin":
+    st.subheader("✅ Model Validation on Standard Dataset")
+
+    dataset_path = "data/diabetes_standard.csv"
+
+    if os.path.exists(dataset_path):
+        data = pd.read_csv(dataset_path)
+
+        # ---- Ensure correct columns ----
+        required_cols = FEATURE_NAMES + ["class"]
+
+        if not all(col in data.columns for col in required_cols):
+            st.error("❌ Dataset columns do not match training features")
+        else:
+            X_val = data[FEATURE_NAMES].copy()
+            y_val = data["class"]
+
+            # ---- Enforce numeric types ----
+            X_val = X_val.astype(int)
+
+            # ---- Predictions ----
+            y_pred = model.predict(X_val)
+            y_prob = model.predict_proba(X_val)[:, 1]
+
+            # ---- Accuracy ----
+            acc = accuracy_score(y_val, y_pred)
+            st.success(f"🎯 Model Accuracy: {acc*100:.2f}%")
+
+            # ---- Confusion Matrix ----
+            from sklearn.metrics import confusion_matrix
+            cm = confusion_matrix(y_val, y_pred)
+
+            fig_cm, ax_cm = plt.subplots()
+            ax_cm.imshow(cm)
+            ax_cm.set_title("Confusion Matrix")
+            ax_cm.set_xlabel("Predicted")
+            ax_cm.set_ylabel("Actual")
+            ax_cm.set_xticks([0, 1])
+            ax_cm.set_yticks([0, 1])
+
+            for i in range(2):
+                for j in range(2):
+                    ax_cm.text(j, i, cm[i, j], ha="center", va="center")
+
+            st.pyplot(fig_cm)
+
+            # ---- ROC Curve ----
+            fpr, tpr, _ = roc_curve(y_val, y_prob)
+            roc_auc = auc(fpr, tpr)
+
+            fig_roc, ax_roc = plt.subplots()
+            ax_roc.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
+            ax_roc.plot([0, 1], [0, 1], linestyle="--")
+            ax_roc.set_xlabel("False Positive Rate")
+            ax_roc.set_ylabel("True Positive Rate")
+            ax_roc.set_title("ROC Curve")
+            ax_roc.legend()
+
+            st.pyplot(fig_roc)
+
+    else:
+        st.warning("⚠ Standard dataset not found at data/diabetes_standard.csv")
+
 # ---------------- FEEDBACK SECTION ----------------
 st.subheader("🔁 Doctor Feedback")
 
@@ -386,3 +450,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
